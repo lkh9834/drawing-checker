@@ -10,11 +10,11 @@ from pdf2image import convert_from_bytes
 # 1. 페이지 기본 설정 및 디자인
 # ==========================================
 st.set_page_config(
-    page_title="실내재료마감표 AI 유연 비교 검토 시스템",
+    page_title="포레나 실내재료마감표 AI 비교 검토 시스템 ver0.1",
     layout="wide"
 )
 
-st.title("🏗️ 실내재료마감표 AI 유연 비교 검토 시스템")
+st.title("🏗️ 포레나 실내재료마감표 AI 비교 검토 시스템 ver0.1")
 st.write("표준 도면 이미지/PDF와 검토 대상 도면(PDF/이미지)을 업로드하면, AI(Gemini 3.5 Flash Lite)가 시각 및 문맥 기반으로 초고속 비교 분석합니다.")
 
 # ==========================================
