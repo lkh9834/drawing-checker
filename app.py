@@ -96,21 +96,17 @@ def create_pdf_report(result_text):
         if line_str.startswith("|"):
             in_table = True
             cells = [c.strip() for c in line_str.split('|')[1:-1]]
-            # 구분선 행(:-:|---) 제외
             if all(c.startswith(':-') or c.startswith('-') or c.endswith('-') for c in cells):
                 continue
                 
-            # 헤더 또는 일반 행
             row_cells = []
             for idx, cell in enumerate(cells):
-                # 특수 태그 및 이모지 안전 변환
                 clean_cell = cell.replace('🔴', '[RED]').replace('🟡', '[YELLOW]').replace('🔵', '[BLUE]')
                 p_style = table_header_style if len(table_data) == 0 else table_cell_style
                 row_cells.append(Paragraph(clean_cell, p_style))
             table_data.append(row_cells)
         else:
             if in_table and table_data:
-                # 테이블 렌더링
                 t = Table(table_data, colWidths=[45, 45, 60, 55, 100, 100, 140])
                 t.setStyle(TableStyle([
                     ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1E3A8A')),
@@ -140,7 +136,6 @@ def create_pdf_report(result_text):
                 story.append(Paragraph(line_str, normal_style))
                 story.append(Spacer(1, 2))
                 
-    # 남아있는 테이블 처리
     if table_data:
         t = Table(table_data, colWidths=[45, 45, 60, 55, 100, 100, 140])
         t.setStyle(TableStyle([
@@ -230,7 +225,7 @@ FULL_SYSTEM_INSTRUCTIONS = """
      * 신규 실 신설, 별도 마감표 분리 신설, 표의 행 순서 변경
 
 출력 형식 (Output Format):
-반드시 아래 마크다운 양식으로만 답변을 작성하세요.
+반드시 아래 마크다운 양식 및 문구를 단 한 문장도 바꾸지 말고 그대로 마지막 섹션에 포함하여 작성하세요.
 
 ---
 ## 🏗️ 실내재료마감표 AI 유연 비교 검토 결과
@@ -254,8 +249,9 @@ FULL_SYSTEM_INSTRUCTIONS = """
 
 ---
 
-### 3. 검토 총평 및 조치 권고사항
-(전체적인 마감재 및 NOTE 조항 변경 경향을 2~3줄로 요약 작성)
+### 3. 검토의 한계 및 참고사항
+- **생성형 AI 검토 특성 안내**: 본 결과는 인공지능 시각 및 문맥 분석 모델을 기반으로 자동 생성된 것으로, 생성 모델의 확률적 특성상 동일한 도면에 대해서도 실행 시마다 검토 표현이나 상세 세부사항이 일부 다르게 도출될 수 있습니다.
+- **실무 재확인 의무**: AI 분석 결과는 1차 검토 지원용 참고 자료입니다. 설계 변경 최종 확정 및 현장 적용 시에는 담당 설계자 및 시공 관리자가 실제 도면 원본을 기반으로 반드시 재확인 및 최종 검증을 수행하시기 바랍니다.
 """
 
 # ==========================================
