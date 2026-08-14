@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 st.title("🏗️ 실내재료마감표 AI 유연 비교 검토 시스템")
-st.write("표준 도면 이미지/PDF와 검토 대상 도면(PDF/이미지)을 업로드하면, AI가 시각 및 문맥 기반으로 유연하게 비교 분석합니다.")
+st.write("표준 도면 이미지/PDF와 검토 대상 도면(PDF/이미지)을 업로드하면, AI(Gemini 3.5 Flash Lite)가 시각 및 문맥 기반으로 초고속 비교 분석합니다.")
 
 # ==========================================
 # 2. 파일 변환 헬퍼 함수 (PDF / 이미지 통합 처리)
@@ -56,7 +56,7 @@ with col2:
     target_file = st.file_uploader("2. 검토 대상 도면 (PDF/이미지)", type=["png", "jpg", "jpeg", "pdf"])
 
 # ==========================================
-# 5. Google AI Studio 풀 지침(Instructions)
+# 5. Google AI Studio 풀 지침(System Instructions)
 # ==========================================
 FULL_SYSTEM_INSTRUCTIONS = """
 역할 및 목표:
@@ -118,7 +118,7 @@ if st.button("🚀 AI 도면 비교 검토 시작", use_container_width=True):
     elif not std_file or not target_file:
         st.warning("두 도면 파일을 모두 업로드해 주세요.")
     else:
-        with st.spinner("Gemini AI가 두 도면을 시각적/문맥적으로 완벽 비교 분석 중입니다... (약 15~25초 소요)"):
+        with st.spinner("Gemini 3.5 Flash Lite 모델이 두 도면을 초고속으로 유연 비교 분석 중입니다..."):
             try:
                 # API 클라이언트 초기화
                 client = genai.Client(api_key=api_key)
@@ -130,9 +130,9 @@ if st.button("🚀 AI 도면 비교 검토 시작", use_container_width=True):
                 # 프롬프트 구성
                 user_prompt = "첨부된 두 도면을 시스템 인스트럭션 규칙에 따라 유연하게 비교 분석하여 최종 검토 결과를 출력해 주세요."
 
-                # Gemini 2.5 Flash 호출
+                # Gemini 3.5 Flash Lite 모델 호출
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model="gemini-3.5-flash-lite",  # 👈 캡처 화면의 정확한 ID 문자열 적용
                     contents=[std_img, target_img, user_prompt],
                     config=types.GenerateContentConfig(
                         system_instruction=FULL_SYSTEM_INSTRUCTIONS,
