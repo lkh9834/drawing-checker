@@ -1,35 +1,80 @@
 import io
+import re
 import json
 import streamlit as st
 from google import genai
 from google.genai import types
-from PIL import Image
+from PIL import Image, ImageDraw
 from pdf2image import convert_from_bytes
 
 # ==========================================
 # 1. 페이지 기본 설정 및 디자인
 # ==========================================
 st.set_page_config(
-    page_title="포레나 실내재료마감표 AI 비교 검토 시스템 ver0.1",
+    page_title="실내재료마감표 AI 유연 비교 검토 시스템",
     layout="wide"
 )
 
-st.title("🏗️ 포레나 실내재료마감표 AI 비교 검토 시스템 ver0.1")
-st.write("표준 도면 이미지/PDF와 검토 대상 도면(PDF/이미지)을 업로드하면, AI(Gemini 3.5 Flash Lite)가 시각 및 문맥 기반으로 초고속 비교 분석합니다.")
+st.title("🏗️ 실내재료마감표 AI 유연 비교 검토 시스템")
+st.write("표준 도면 이미지/PDF와 검토 대상 도면(PDF/이미지)을 업로드하면, AI가 시각 및 문맥 기반 분석 후 **컬러 블록 하이라이트 도면**과 세부 비교표를 생성합니다.")
 
 # ==========================================
-# 2. 파일 변환 헬퍼 함수 (PDF / 이미지 통합 처리)
+# 2. 파일 변환 헬퍼 함수
 # ==========================================
 def load_as_image(uploaded_file):
     """PDF 또는 이미지 파일을 PIL Image 객체로 안전하게 변환합니다."""
     file_bytes = uploaded_file.read()
     if uploaded_file.name.lower().endswith(".pdf"):
-        # PDF 파일인 경우 첫 번째 페이지를 이미지(300 DPI)로 렌더링
         images = convert_from_bytes(file_bytes, dpi=300)
         return images[0]
     else:
-        # 일반 이미지 파일인 경우
         return Image.open(io.BytesIO(file_bytes))
+
+def draw_color_blocks(image, markdown_text):
+    """AI 응답 텍스트에서 좌표와 등급을 추출하여 도면 이미지 위에 반투명 컬러 블록을 그립니다."""
+    img_copy = image.copy().convert("RGBA")
+    overlay = Image.new("RGBA", img_copy.size, (255, 255, 255, 0))
+    draw = ImageDraw.Draw(overlay)
+    
+    w, h = img_copy.size
+    
+    # 마크다운 표 행별 파싱
+    lines = markdown_text.split('\n')
+    color_map = {
+        "RED": (255, 50, 50, 90),     # 반투명 빨강
+        "YELLOW": (255, 200, 0, 90),  # 반투명 노랑
+        "BLUE": (0, 150, 255, 80)     # 반투명 파랑
+    }
+    
+    found_box = False
+    for line in lines:
+        if "|" in line:
+            # 좌표 패턴 추출 [ymin, xmin, ymax, xmax]
+            coords = re.findall(r'\[\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\]', line)
+            if coords:
+                ymin, xmin, ymax, xmax = map(int, coords[0])
+                
+                # 색상 등급 확인
+                box_color = (255, 0, 0, 90) # 기본값 Red
+                for key, color in color_map.items():
+                    if key in line:
+                        box_color = color
+                        break
+                
+                # 0~1000 상대좌표를 실제 이미지 픽셀 좌표로 변환
+                x1 = int(xmin * w / 1000)
+                y1 = int(ymin * h / 1000)
+                x2 = int(xmax * w / 1000)
+                y2 = int(ymax * h / 1000)
+                
+                # 반투명 사각형 및 외곽선 그리기
+                draw.rectangle([x1, y1, x2, y2], fill=box_color, outline=(box_color[0], box_color[1], box_color[2], 255), width=3)
+                found_box = True
+
+    if found_box:
+        result_img = Image.alpha_composite(img_copy, overlay)
+        return result_img.convert("RGB")
+    return None
 
 # ==========================================
 # 3. 사이드바 - API Key 및 검토 안내
@@ -118,7 +163,7 @@ if st.button("🚀 AI 도면 비교 검토 시작", use_container_width=True):
     elif not std_file or not target_file:
         st.warning("두 도면 파일을 모두 업로드해 주세요.")
     else:
-        with st.spinner("Gemini 3.5 Flash Lite 모델이 두 도면을 초고속으로 유연 비교 분석 중입니다..."):
+        with st.spinner("Gemini 3.5 Flash Lite 모델이 도면 분석 및 컬러 하이라이트를 생성 중입니다..."):
             try:
                 # API 클라이언트 초기화
                 client = genai.Client(api_key=api_key)
@@ -132,7 +177,7 @@ if st.button("🚀 AI 도면 비교 검토 시작", use_container_width=True):
 
                 # Gemini 3.5 Flash Lite 모델 호출
                 response = client.models.generate_content(
-                    model="gemini-3.5-flash-lite",  # 👈 캡처 화면의 정확한 ID 문자열 적용
+                    model="gemini-3.5-flash-lite",
                     contents=[std_img, target_img, user_prompt],
                     config=types.GenerateContentConfig(
                         system_instruction=FULL_SYSTEM_INSTRUCTIONS,
@@ -140,8 +185,17 @@ if st.button("🚀 AI 도면 비교 검토 시작", use_container_width=True):
                     )
                 )
 
-                # 결과 화면 출력
-                st.success("✅ 검토가 성공적으로 완료되었습니다!")
+                # 1. 시각화 오버레이 이미지 생성 및 표시
+                result_overlay_img = draw_color_blocks(target_img, response.text)
+                
+                st.success("✅ 검토가 완료되었습니다!")
+                
+                if result_overlay_img:
+                    st.subheader("🎨 검토 도면 시각화 오버레이 (컬러 블록 하이라이트)")
+                    st.image(result_overlay_img, caption="검토 대상 도면 하이라이트 결과", use_container_width=True)
+                    st.divider()
+
+                # 2. 세부 텍스트/마크다운 분석 결과 출력
                 st.markdown(response.text)
 
             except Exception as e:
