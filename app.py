@@ -16,7 +16,7 @@ from reportlab.lib import colors
 # 1. 페이지 기본 설정 및 디자인
 # ==========================================
 st.set_page_config(
-    page_title="실내재료마감표 AI 유연 비교 검토 시스템2",
+    page_title="실내재료마감표 AI 유연 비교 검토 시스템",
     layout="wide"
 )
 
@@ -24,16 +24,20 @@ st.title("🏗️ 실내재료마감표 AI 유연 비교 검토 시스템")
 st.write("표준 도면과 검토 대상 도면의 **실별 마감재 스펙 및 하단 노트(NOTE) 주기사항**을 공간명 기준으로 전수 교차 분석하여 정밀 검토 리포트를 생성합니다.")
 
 # ==========================================
-# 2. PDF/이미지 처리 및 PDF 리포트 생성 함수
+# 2. 파일 변환 및 PDF 리포트 생성 함수
 # ==========================================
-def load_as_bytes(uploaded_file):
-    """업로드된 파일의 바이트 및 이미지 데이터를 안전하게 읽어옵니다."""
+def load_for_gemini(uploaded_file):
+    """업로드된 파일을 Gemini API가 인식할 수 있는 Part 객체 또는 PIL Image로 적절히 변환합니다."""
     file_bytes = uploaded_file.read()
     if uploaded_file.name.lower().endswith(".pdf"):
-        return {"data": file_bytes, "mime": "application/pdf"}
+        # PDF 파일은 types.Part.from_bytes로 생성
+        return types.Part.from_bytes(
+            data=file_bytes,
+            mime_type="application/pdf"
+        )
     else:
-        img = Image.open(io.BytesIO(file_bytes))
-        return {"data": img, "mime": "image/png"}
+        # 일반 이미지 파일인 경우 PIL Image 객체 생성
+        return Image.open(io.BytesIO(file_bytes))
 
 def create_pdf_report(result_text):
     """AI 검토 결과 마크다운 텍스트를 바탕으로 깔끔한 PDF 보고서를 메모리 상에서 생성합니다."""
@@ -194,19 +198,20 @@ if st.button("🚀 AI 도면 비교 검토 시작", use_container_width=True):
     elif not std_file or not target_file:
         st.warning("두 도면 파일을 모두 업로드해 주세요.")
     else:
-        with st.spinner("Gemini 3.5 Flash Lite 모델이 분류 등급순(RED ➔ YELLOW ➔ BLUE)으로 정밀 검토 중입니다..."):
+        with st.spinner("Gemini 3.5 Flash Lite 모델이 정밀 교차 검토 중입니다..."):
             try:
                 client = genai.Client(api_key=api_key)
                 
-                std_data = load_as_bytes(std_file)
-                target_data = load_as_bytes(target_file)
+                std_part = load_for_gemini(std_file)
+                target_part = load_for_gemini(target_file)
 
-                input_contents = []
-                input_contents.append("--- [표준 실내재료마감표 도면] ---")
-                input_contents.append(std_data["data"])
-                input_contents.append("--- [검토 대상 도면] ---")
-                input_contents.append(target_data["data"])
-                input_contents.append("지시된 9가지 '부위' 표준 명칭을 사용하고, 비교표 결과는 반드시 분류 등급(RED -> YELLOW -> BLUE) 순서대로 정렬하여 작성해 주세요.")
+                input_contents = [
+                    "--- [표준 실내재료마감표 도면] ---",
+                    std_part,
+                    "--- [검토 대상 도면] ---",
+                    target_part,
+                    "지시된 9가지 '부위' 표준 명칭을 사용하고, 비교표 결과는 반드시 분류 등급(RED -> YELLOW -> BLUE) 순서대로 정렬하여 작성해 주세요."
+                ]
 
                 response = client.models.generate_content(
                     model="gemini-3.5-flash-lite",
@@ -217,7 +222,7 @@ if st.button("🚀 AI 도면 비교 검토 시작", use_container_width=True):
                     )
                 )
                 
-                st.success("✅ 분류 등급 정렬 검토가 완료되었습니다!")
+                st.success("✅ 검토가 성공적으로 완료 되었습니다!")
                 
                 # PDF 리포트 생성 및 다운로드 버튼
                 pdf_bytes = create_pdf_report(response.text)
