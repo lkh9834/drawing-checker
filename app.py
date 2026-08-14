@@ -1,8 +1,10 @@
+import io
 import json
 import streamlit as st
 from google import genai
 from google.genai import types
 from PIL import Image
+from pdf2image import convert_from_bytes
 
 # ==========================================
 # 1. 페이지 기본 설정 및 디자인
@@ -13,10 +15,24 @@ st.set_page_config(
 )
 
 st.title("🏗️ 실내재료마감표 AI 유연 비교 검토 시스템")
-st.write("표준 도면 이미지와 검토 대상 도면(PDF/이미지)을 업로드하면, AI가 시각 및 문맥 기반으로 유연하게 비교 분석합니다.")
+st.write("표준 도면 이미지/PDF와 검토 대상 도면(PDF/이미지)을 업로드하면, AI가 시각 및 문맥 기반으로 유연하게 비교 분석합니다.")
 
 # ==========================================
-# 2. 사이드바 - API Key 및 검토 안내
+# 2. 파일 변환 헬퍼 함수 (PDF / 이미지 통합 처리)
+# ==========================================
+def load_as_image(uploaded_file):
+    """PDF 또는 이미지 파일을 PIL Image 객체로 안전하게 변환합니다."""
+    file_bytes = uploaded_file.read()
+    if uploaded_file.name.lower().endswith(".pdf"):
+        # PDF 파일인 경우 첫 번째 페이지를 이미지(300 DPI)로 렌더링
+        images = convert_from_bytes(file_bytes, dpi=300)
+        return images[0]
+    else:
+        # 일반 이미지 파일인 경우
+        return Image.open(io.BytesIO(file_bytes))
+
+# ==========================================
+# 3. 사이드바 - API Key 및 검토 안내
 # ==========================================
 with st.sidebar:
     st.header("🔑 설정")
@@ -31,7 +47,7 @@ with st.sidebar:
     """)
 
 # ==========================================
-# 3. 도면 파일 업로드 구역
+# 4. 도면 파일 업로드 구역
 # ==========================================
 col1, col2 = st.columns(2)
 with col1:
@@ -40,7 +56,7 @@ with col2:
     target_file = st.file_uploader("2. 검토 대상 도면 (PDF/이미지)", type=["png", "jpg", "jpeg", "pdf"])
 
 # ==========================================
-# 4. Google AI Studio 풀 지침(Instructions) 세팅
+# 5. Google AI Studio 풀 지침(Instructions)
 # ==========================================
 FULL_SYSTEM_INSTRUCTIONS = """
 역할 및 목표:
@@ -94,7 +110,7 @@ FULL_SYSTEM_INSTRUCTIONS = """
 """
 
 # ==========================================
-# 5. AI 검토 실행 로직
+# 6. AI 검토 실행 로직
 # ==========================================
 if st.button("🚀 AI 도면 비교 검토 시작", use_container_width=True):
     if not api_key:
@@ -107,9 +123,9 @@ if st.button("🚀 AI 도면 비교 검토 시작", use_container_width=True):
                 # API 클라이언트 초기화
                 client = genai.Client(api_key=api_key)
                 
-                # 이미지 열기
-                std_img = Image.open(std_file)
-                target_img = Image.open(target_file)
+                # PDF/이미지 안전 자동 변환
+                std_img = load_as_image(std_file)
+                target_img = load_as_image(target_file)
 
                 # 프롬프트 구성
                 user_prompt = "첨부된 두 도면을 시스템 인스트럭션 규칙에 따라 유연하게 비교 분석하여 최종 검토 결과를 출력해 주세요."
@@ -120,12 +136,12 @@ if st.button("🚀 AI 도면 비교 검토 시작", use_container_width=True):
                     contents=[std_img, target_img, user_prompt],
                     config=types.GenerateContentConfig(
                         system_instruction=FULL_SYSTEM_INSTRUCTIONS,
-                        temperature=0.2 # 정확도를 위해 낮게 설정
+                        temperature=0.2
                     )
                 )
 
-                # 결과 화면에 출력
-                st.success("✅ 검토가 성공적으로 완료 되었습니다!")
+                # 결과 화면 출력
+                st.success("✅ 검토가 성공적으로 완료되었습니다!")
                 st.markdown(response.text)
 
             except Exception as e:
