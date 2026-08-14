@@ -40,11 +40,11 @@ font_loaded = register_korean_font()
 # 1. 페이지 기본 설정 및 디자인
 # ==========================================
 st.set_page_config(
-    page_title="Forena 실내재료마감표 비교 검토 시스템 0.1",
+    page_title="Forena 실내재료마감표 비교 검토 시스템 Beta",
     layout="wide"
 )
 
-st.title("Forena 실내재료마감표 비교 검토 시스템 0.1")
+st.title("Forena 실내재료마감표 비교 검토 시스템 Beta")
 st.write("표준 도면과 검토 대상 도면의 **실별 마감재 스펙 및 하단 노트(NOTE) 주기사항**을 공간명 기준으로 전수 교차 분석하여 정밀 검토 리포트를 생성합니다.")
 
 # ==========================================
